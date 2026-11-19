@@ -1,0 +1,383 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Global Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (request.auth.token.email == 'rastogi.pragati.it@gmail.com' && request.auth.token.email_verified == true)
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidTimestamp(ts) {
+      return ts is timestamp && ts <= request.time;
+    }
+
+    // 3. Entity Validation Blueprints
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80 &&
+             (!('email' in data) || (data.email is string && data.email.size() <= 120)) &&
+             (!('photoUrl' in data) || (data.photoUrl is string && data.photoUrl.size() <= 500)) &&
+             (!('bio' in data) || (data.bio is string && data.bio.size() <= 200)) &&
+             data.xp is int && data.xp >= 0 && data.xp <= 10000000 &&
+             data.level is int && data.level >= 1 && data.level <= 1000 &&
+             data.remindersEnabled is bool &&
+             (!('dailySummaryTime' in data) || (data.dailySummaryTime is string && data.dailySummaryTime.size() <= 10)) &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidHabit(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+             (!('description' in data) || (data.description is string && data.description.size() <= 400)) &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 50 &&
+             data.scheduleType in ['DAILY', 'WEEKLY', 'CUSTOM'] &&
+             data.targetDays is list && data.targetDays.size() <= 7 &&
+             (data.targetDays.size() == 0 || data.targetDays[0] is int) &&
+             data.targetFrequency is int && data.targetFrequency >= 1 && data.targetFrequency <= 20 &&
+             data.priority in ['LOW', 'MEDIUM', 'HIGH'] &&
+             data.startDate is string && data.startDate.size() == 10 &&
+             (!('reminderTime' in data) || (data.reminderTime is string && data.reminderTime.size() <= 10)) &&
+             data.remindersEnabled is bool &&
+             data.paused is bool &&
+             (!('colorHex' in data) || (data.colorHex is string && data.colorHex.size() <= 12)) &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidHabitCompletion(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.habitId is string && data.habitId.size() >= 1 && data.habitId.size() <= 128 &&
+             data.habitName is string && data.habitName.size() >= 1 && data.habitName.size() <= 100 &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 50 &&
+             data.date is string && data.date.size() == 10 &&
+             data.completedCount is int && data.completedCount >= 1 && data.completedCount <= 20 &&
+             data.targetFrequency is int && data.targetFrequency >= 1 && data.targetFrequency <= 20 &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 300)) &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidRoutine(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+             data.timeOfDay in ['MORNING', 'AFTERNOON', 'EVENING', 'CUSTOM'] &&
+             data.startTime is string && data.startTime.size() >= 1 && data.startTime.size() <= 10 &&
+             data.habitIds is list && data.habitIds.size() <= 30 &&
+             (data.habitIds.size() == 0 || data.habitIds[0] is string) &&
+             data.remindersEnabled is bool &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidUserAchievement(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.badgeKey is string && data.badgeKey.size() >= 1 && data.badgeKey.size() <= 60 &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 80 &&
+             (!('description' in data) || (data.description is string && data.description.size() <= 200)) &&
+             data.xpReward is int && data.xpReward >= 0 && data.xpReward <= 5000 &&
+             isValidTimestamp(data.unlockedAt);
+    }
+
+    function isValidChallengeProgress(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.challengeId is string && data.challengeId.size() >= 1 && data.challengeId.size() <= 128 &&
+             data.progress is int && data.progress >= 0 && data.progress <= 1000 &&
+             data.target is int && data.target >= 1 && data.target <= 1000 &&
+             data.completed is bool &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidHabitCategory(data) {
+      return data.name is string && data.name.size() >= 1 && data.name.size() <= 50 &&
+             data.iconName is string && data.iconName.size() >= 1 && data.iconName.size() <= 40 &&
+             data.colorHex is string && data.colorHex.size() >= 1 && data.colorHex.size() <= 12 &&
+             data.active is bool &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidMotivationalMessage(data) {
+      return data.quote is string && data.quote.size() >= 1 && data.quote.size() <= 280 &&
+             data.author is string && data.author.size() >= 1 && data.author.size() <= 80 &&
+             data.active is bool &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidChallenge(data) {
+      return data.title is string && data.title.size() >= 1 && data.title.size() <= 100 &&
+             data.description is string && data.description.size() >= 1 && data.description.size() <= 300 &&
+             data.type in ['DAILY', 'WEEKLY'] &&
+             data.targetCount is int && data.targetCount >= 1 && data.targetCount <= 100 &&
+             data.xpReward is int && data.xpReward >= 1 && data.xpReward <= 5000 &&
+             data.active is bool &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidAppSettings(data) {
+      return data.adsEnabled is bool &&
+             (!('adPublisherId' in data) || (data.adPublisherId is string && data.adPublisherId.size() <= 100)) &&
+             (!('dashboardAdSlotId' in data) || (data.dashboardAdSlotId is string && data.dashboardAdSlotId.size() <= 100)) &&
+             (!('analyticsAdSlotId' in data) || (data.analyticsAdSlotId is string && data.analyticsAdSlotId.size() <= 100)) &&
+             data.showAdsOnDashboard is bool &&
+             data.showAdsOnAnalytics is bool &&
+             data.maintenanceMode is bool &&
+             (!('announcement' in data) || (data.announcement is string && data.announcement.size() <= 240)) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    // 4. Admins Marker Collection
+    match /admins/{adminUid} {
+      allow get: if isValidId(adminUid) && (isOwner(adminUid) || isAdmin());
+      allow list: if isAdmin();
+      allow create, update, delete: if false;
+    }
+
+    // 5. User Profiles & Subcollections (Strict Owner Isolation + Admin Read)
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+
+      allow create: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll(['userId', 'displayName', 'xp', 'level', 'remindersEnabled', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'displayName', 'email', 'photoUrl', 'bio', 'xp', 'level', 'remindersEnabled', 'dailySummaryTime', 'createdAt', 'updatedAt']) &&
+                       isValidUserProfile(incoming());
+
+      allow update: if isValidId(userId) &&
+                       isValidUserProfile(incoming()) && (
+                         isAdmin() || (
+                           isOwner(userId) &&
+                           incoming().userId == existing().userId &&
+                           incoming().createdAt == existing().createdAt &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'email', 'photoUrl', 'bio', 'xp', 'level', 'remindersEnabled', 'dailySummaryTime', 'updatedAt'])
+                         )
+                       );
+
+      allow delete: if isValidId(userId) && (isOwner(userId) || isAdmin());
+
+      // Habits Subcollection
+      match /habits/{habitId} {
+        allow get: if isValidId(userId) && isValidId(habitId) && (isOwner(userId) || isAdmin());
+        allow list: if isValidId(userId) && (isOwner(userId) || isAdmin());
+
+        allow create: if isOwner(userId) &&
+                         isValidId(userId) &&
+                         isValidId(habitId) &&
+                         incoming().userId == request.auth.uid &&
+                         incoming().keys().hasAll(['userId', 'name', 'category', 'scheduleType', 'targetDays', 'targetFrequency', 'priority', 'startDate', 'remindersEnabled', 'paused', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'name', 'description', 'category', 'scheduleType', 'targetDays', 'targetFrequency', 'priority', 'startDate', 'reminderTime', 'remindersEnabled', 'paused', 'colorHex', 'createdAt', 'updatedAt']) &&
+                         isValidHabit(incoming());
+
+        allow update: if isOwner(userId) &&
+                         isValidId(userId) &&
+                         isValidId(habitId) &&
+                         isValidHabit(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description', 'category', 'scheduleType', 'targetDays', 'targetFrequency', 'priority', 'startDate', 'reminderTime', 'remindersEnabled', 'paused', 'colorHex', 'updatedAt']);
+
+        allow delete: if isValidId(userId) && isValidId(habitId) && isOwner(userId);
+      }
+
+      // Completions Subcollection
+      match /completions/{completionId} {
+        allow get: if isValidId(userId) && isValidId(completionId) && (isOwner(userId) || isAdmin());
+        allow list: if isValidId(userId) && (isOwner(userId) || isAdmin());
+
+        allow create: if isOwner(userId) &&
+                         isValidId(userId) &&
+                         isValidId(completionId) &&
+                         incoming().userId == request.auth.uid &&
+                         incoming().keys().hasAll(['userId', 'habitId', 'habitName', 'category', 'date', 'completedCount', 'targetFrequency', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'habitId', 'habitName', 'category', 'date', 'completedCount', 'targetFrequency', 'notes', 'createdAt', 'updatedAt']) &&
+                         isValidHabitCompletion(incoming());
+
+        allow update: if isOwner(userId) &&
+                         isValidId(userId) &&
+                         isValidId(completionId) &&
+                         isValidHabitCompletion(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().habitId == existing().habitId &&
+                         incoming().date == existing().date &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['habitName', 'category', 'completedCount', 'targetFrequency', 'notes', 'updatedAt']);
+
+        allow delete: if isValidId(userId) && isValidId(completionId) && isOwner(userId);
+      }
+
+      // Routines Subcollection
+      match /routines/{routineId} {
+        allow get: if isValidId(userId) && isValidId(routineId) && (isOwner(userId) || isAdmin());
+        allow list: if isValidId(userId) && (isOwner(userId) || isAdmin());
+
+        allow create: if isOwner(userId) &&
+                         isValidId(userId) &&
+                         isValidId(routineId) &&
+                         incoming().userId == request.auth.uid &&
+                         incoming().keys().hasAll(['userId', 'name', 'timeOfDay', 'startTime', 'habitIds', 'remindersEnabled', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'name', 'timeOfDay', 'startTime', 'habitIds', 'remindersEnabled', 'createdAt', 'updatedAt']) &&
+                         isValidRoutine(incoming());
+
+        allow update: if isOwner(userId) &&
+                         isValidId(userId) &&
+                         isValidId(routineId) &&
+                         isValidRoutine(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['name', 'timeOfDay', 'startTime', 'habitIds', 'remindersEnabled', 'updatedAt']);
+
+        allow delete: if isValidId(userId) && isValidId(routineId) && isOwner(userId);
+      }
+
+      // Achievements Subcollection
+      match /achievements/{achievementId} {
+        allow get: if isValidId(userId) && isValidId(achievementId) && (isOwner(userId) || isAdmin());
+        allow list: if isValidId(userId) && (isOwner(userId) || isAdmin());
+
+        allow create: if isOwner(userId) &&
+                         isValidId(userId) &&
+                         isValidId(achievementId) &&
+                         incoming().userId == request.auth.uid &&
+                         incoming().keys().hasAll(['userId', 'badgeKey', 'title', 'xpReward', 'unlockedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'badgeKey', 'title', 'description', 'xpReward', 'unlockedAt']) &&
+                         isValidUserAchievement(incoming());
+
+        allow update: if false; // Achievements are immutable once unlocked
+        allow delete: if isValidId(userId) && isValidId(achievementId) && isOwner(userId);
+      }
+
+      // Challenge Progress Subcollection
+      match /challengeProgress/{challengeId} {
+        allow get: if isValidId(userId) && isValidId(challengeId) && (isOwner(userId) || isAdmin());
+        allow list: if isValidId(userId) && (isOwner(userId) || isAdmin());
+
+        allow create: if isOwner(userId) &&
+                         isValidId(userId) &&
+                         isValidId(challengeId) &&
+                         incoming().userId == request.auth.uid &&
+                         incoming().keys().hasAll(['userId', 'challengeId', 'progress', 'target', 'completed', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'challengeId', 'progress', 'target', 'completed', 'updatedAt']) &&
+                         isValidChallengeProgress(incoming());
+
+        allow update: if isOwner(userId) &&
+                         isValidId(userId) &&
+                         isValidId(challengeId) &&
+                         isValidChallengeProgress(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().challengeId == existing().challengeId &&
+                         (!existing().completed || incoming().completed == true) && // Terminal completion lock
+                         incoming().diff(existing()).affectedKeys().hasOnly(['progress', 'target', 'completed', 'updatedAt']);
+
+        allow delete: if isValidId(userId) && isValidId(challengeId) && isOwner(userId);
+      }
+    }
+
+    // 6. Admin-Managed Non-PII Global Catalogs & Config
+    match /categories/{categoryId} {
+      allow get: if isValidId(categoryId) && isSignedIn();
+      allow list: if isSignedIn();
+
+      allow create: if isAdmin() &&
+                       isValidId(categoryId) &&
+                       incoming().keys().hasAll(['name', 'iconName', 'colorHex', 'active', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['name', 'iconName', 'colorHex', 'active', 'createdAt', 'updatedAt']) &&
+                       isValidHabitCategory(incoming());
+
+      allow update: if isAdmin() &&
+                       isValidId(categoryId) &&
+                       isValidHabitCategory(incoming()) &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['name', 'iconName', 'colorHex', 'active', 'updatedAt']);
+
+      allow delete: if isAdmin() && isValidId(categoryId);
+    }
+
+    match /motivational_messages/{messageId} {
+      allow get: if isValidId(messageId) && isSignedIn();
+      allow list: if isSignedIn();
+
+      allow create: if isAdmin() &&
+                       isValidId(messageId) &&
+                       incoming().keys().hasAll(['quote', 'author', 'active', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['quote', 'author', 'active', 'createdAt', 'updatedAt']) &&
+                       isValidMotivationalMessage(incoming());
+
+      allow update: if isAdmin() &&
+                       isValidId(messageId) &&
+                       isValidMotivationalMessage(incoming()) &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['quote', 'author', 'active', 'updatedAt']);
+
+      allow delete: if isAdmin() && isValidId(messageId);
+    }
+
+    match /challenges/{challengeId} {
+      allow get: if isValidId(challengeId) && isSignedIn();
+      allow list: if isSignedIn();
+
+      allow create: if isAdmin() &&
+                       isValidId(challengeId) &&
+                       incoming().keys().hasAll(['title', 'description', 'type', 'targetCount', 'xpReward', 'active', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['title', 'description', 'type', 'targetCount', 'xpReward', 'active', 'createdAt', 'updatedAt']) &&
+                       isValidChallenge(incoming());
+
+      allow update: if isAdmin() &&
+                       isValidId(challengeId) &&
+                       isValidChallenge(incoming()) &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'type', 'targetCount', 'xpReward', 'active', 'updatedAt']);
+
+      allow delete: if isAdmin() && isValidId(challengeId);
+    }
+
+    match /app_config/{configId} {
+      allow get: if isValidId(configId) && isSignedIn();
+      allow list: if isAdmin();
+
+      allow create: if isAdmin() &&
+                       isValidId(configId) &&
+                       incoming().keys().hasAll(['adsEnabled', 'showAdsOnDashboard', 'showAdsOnAnalytics', 'maintenanceMode', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['adsEnabled', 'adPublisherId', 'dashboardAdSlotId', 'analyticsAdSlotId', 'showAdsOnDashboard', 'showAdsOnAnalytics', 'maintenanceMode', 'announcement', 'updatedAt']) &&
+                       isValidAppSettings(incoming());
+
+      allow update: if isAdmin() &&
+                       isValidId(configId) &&
+                       isValidAppSettings(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['adsEnabled', 'adPublisherId', 'dashboardAdSlotId', 'analyticsAdSlotId', 'showAdsOnDashboard', 'showAdsOnAnalytics', 'maintenanceMode', 'announcement', 'updatedAt']);
+
+      allow delete: if isAdmin() && isValidId(configId);
+    }
+  }
+}

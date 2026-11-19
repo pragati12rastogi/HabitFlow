@@ -1,0 +1,6 @@
+{
+  "name": "HabitFlow",
+  "description": "Smart Habit & Routine Builder with daily tracking, custom routines, analytics, reminders, and gamification.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

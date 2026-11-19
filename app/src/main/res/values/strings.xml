@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">HabitFlow</string>
+    <string name="app_tagline">Build positive habits &amp; effortless daily routines</string>
+    <string name="sign_in_with_google">Sign in with Google</string>
+    <string name="nav_dashboard">Today</string>
+    <string name="nav_habits">Habits</string>
+    <string name="nav_routines">Routines</string>
+    <string name="nav_analytics">Analytics</string>
+    <string name="nav_profile">Profile</string>
+    <string name="empty_habits_title">Ready to start your flow?</string>
+    <string name="empty_habits_subtitle">Create your first habit or load sample habits to explore streaks, routines, and analytics.</string>
+</resources>

@@ -1,0 +1,210 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Private authenticated user profile, XP progression, and reminder preferences.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID of the user." },
+        "displayName": { "type": "string", "description": "User display name." },
+        "email": { "type": "string", "description": "User email address (private to owner and admin)." },
+        "photoUrl": { "type": "string", "description": "Optional profile avatar URL." },
+        "bio": { "type": "string", "description": "Personal motto or goal statement." },
+        "xp": { "type": "integer", "description": "Total experience points earned." },
+        "level": { "type": "integer", "description": "Current gamification level." },
+        "remindersEnabled": { "type": "boolean", "description": "Global reminder notification preference." },
+        "dailySummaryTime": { "type": "string", "description": "Preferred daily reminder time HH:mm." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp of creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp of last update." }
+      },
+      "required": ["userId", "displayName", "xp", "level", "remindersEnabled", "createdAt", "updatedAt"]
+    },
+    "Habit": {
+      "title": "Habit",
+      "description": "A user-defined habit with schedule, priority, category, and reminder settings.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner UID." },
+        "name": { "type": "string", "description": "Habit title." },
+        "description": { "type": "string", "description": "Optional habit details." },
+        "category": { "type": "string", "description": "Habit category name." },
+        "scheduleType": { "type": "string", "enum": ["DAILY", "WEEKLY", "CUSTOM"], "description": "Recurrence pattern." },
+        "targetDays": { "type": "array", "description": "Weekday numbers 1 (Mon) to 7 (Sun)." },
+        "targetFrequency": { "type": "integer", "description": "Target completions per scheduled day." },
+        "priority": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"], "description": "Habit priority." },
+        "startDate": { "type": "string", "description": "Start date YYYY-MM-DD." },
+        "reminderTime": { "type": "string", "description": "Optional HH:mm reminder time." },
+        "remindersEnabled": { "type": "boolean", "description": "Whether reminders are active for this habit." },
+        "paused": { "type": "boolean", "description": "Whether the habit is temporarily paused." },
+        "colorHex": { "type": "string", "description": "Accent hex color for the habit card." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp of creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp of last update." }
+      },
+      "required": ["userId", "name", "category", "scheduleType", "targetDays", "targetFrequency", "priority", "startDate", "remindersEnabled", "paused", "createdAt", "updatedAt"]
+    },
+    "HabitCompletion": {
+      "title": "HabitCompletion",
+      "description": "Completion record uniquely keyed by habitId_YYYY-MM-DD to prevent duplicates.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner UID." },
+        "habitId": { "type": "string", "description": "Parent habit document ID." },
+        "habitName": { "type": "string", "description": "Snapshot of habit name." },
+        "category": { "type": "string", "description": "Snapshot of habit category." },
+        "date": { "type": "string", "description": "Completion date YYYY-MM-DD." },
+        "completedCount": { "type": "integer", "description": "Completions logged for this date." },
+        "targetFrequency": { "type": "integer", "description": "Target frequency on that date." },
+        "notes": { "type": "string", "description": "Optional reflection or completion notes." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp of creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp of last update." }
+      },
+      "required": ["userId", "habitId", "habitName", "category", "date", "completedCount", "targetFrequency", "createdAt", "updatedAt"]
+    },
+    "Routine": {
+      "title": "Routine",
+      "description": "Ordered daily routine grouping habits into Morning, Afternoon, Evening, or Custom flows.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner UID." },
+        "name": { "type": "string", "description": "Routine name." },
+        "timeOfDay": { "type": "string", "enum": ["MORNING", "AFTERNOON", "EVENING", "CUSTOM"], "description": "Time of day slot." },
+        "startTime": { "type": "string", "description": "Routine start time HH:mm." },
+        "habitIds": { "type": "array", "description": "Ordered list of habit IDs in this routine." },
+        "remindersEnabled": { "type": "boolean", "description": "Whether routine reminder is enabled." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp of creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp of last update." }
+      },
+      "required": ["userId", "name", "timeOfDay", "startTime", "habitIds", "remindersEnabled", "createdAt", "updatedAt"]
+    },
+    "UserAchievement": {
+      "title": "UserAchievement",
+      "description": "Unlocked achievement badge for a user.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner UID." },
+        "badgeKey": { "type": "string", "description": "Canonical badge key." },
+        "title": { "type": "string", "description": "Badge display title." },
+        "description": { "type": "string", "description": "Badge unlock description." },
+        "xpReward": { "type": "integer", "description": "XP awarded for unlocking." },
+        "unlockedAt": { "type": "string", "format": "date-time", "description": "Server timestamp when unlocked." }
+      },
+      "required": ["userId", "badgeKey", "title", "xpReward", "unlockedAt"]
+    },
+    "ChallengeProgress": {
+      "title": "ChallengeProgress",
+      "description": "User progress toward a daily or weekly challenge.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner UID." },
+        "challengeId": { "type": "string", "description": "Challenge ID." },
+        "progress": { "type": "integer", "description": "Current progress count." },
+        "target": { "type": "integer", "description": "Target count." },
+        "completed": { "type": "boolean", "description": "Whether the challenge is completed." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp of last update." }
+      },
+      "required": ["userId", "challengeId", "progress", "target", "completed", "updatedAt"]
+    },
+    "HabitCategory": {
+      "title": "HabitCategory",
+      "description": "Admin-managed habit category.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "iconName": { "type": "string" },
+        "colorHex": { "type": "string" },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "iconName", "colorHex", "active", "createdAt", "updatedAt"]
+    },
+    "MotivationalMessage": {
+      "title": "MotivationalMessage",
+      "description": "Admin-managed motivational quote of the day.",
+      "type": "object",
+      "properties": {
+        "quote": { "type": "string" },
+        "author": { "type": "string" },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["quote", "author", "active", "createdAt", "updatedAt"]
+    },
+    "Challenge": {
+      "title": "Challenge",
+      "description": "Admin-managed daily or weekly gamification challenge.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "type": { "type": "string", "enum": ["DAILY", "WEEKLY"] },
+        "targetCount": { "type": "integer" },
+        "xpReward": { "type": "integer" },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "description", "type", "targetCount", "xpReward", "active", "createdAt", "updatedAt"]
+    },
+    "AppSettings": {
+      "title": "AppSettings",
+      "description": "Global application and ad placement configuration managed by admins.",
+      "type": "object",
+      "properties": {
+        "adsEnabled": { "type": "boolean" },
+        "adPublisherId": { "type": "string" },
+        "dashboardAdSlotId": { "type": "string" },
+        "analyticsAdSlotId": { "type": "string" },
+        "showAdsOnDashboard": { "type": "boolean" },
+        "showAdsOnAnalytics": { "type": "boolean" },
+        "maintenanceMode": { "type": "boolean" },
+        "announcement": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["adsEnabled", "showAdsOnDashboard", "showAdsOnAnalytics", "maintenanceMode", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Owner-only and admin-readable user profile."
+    },
+    "/users/{userId}/habits/{habitId}": {
+      "schema": { "$ref": "#/entities/Habit" },
+      "description": "User-scoped habits."
+    },
+    "/users/{userId}/completions/{completionId}": {
+      "schema": { "$ref": "#/entities/HabitCompletion" },
+      "description": "User-scoped daily habit completion records keyed by habitId_YYYY-MM-DD."
+    },
+    "/users/{userId}/routines/{routineId}": {
+      "schema": { "$ref": "#/entities/Routine" },
+      "description": "User-scoped routines."
+    },
+    "/users/{userId}/achievements/{achievementId}": {
+      "schema": { "$ref": "#/entities/UserAchievement" },
+      "description": "User-scoped unlocked achievement badges."
+    },
+    "/users/{userId}/challengeProgress/{challengeId}": {
+      "schema": { "$ref": "#/entities/ChallengeProgress" },
+      "description": "User-scoped challenge progress."
+    },
+    "/categories/{categoryId}": {
+      "schema": { "$ref": "#/entities/HabitCategory" },
+      "description": "Global habit categories."
+    },
+    "/motivational_messages/{messageId}": {
+      "schema": { "$ref": "#/entities/MotivationalMessage" },
+      "description": "Global motivational messages."
+    },
+    "/challenges/{challengeId}": {
+      "schema": { "$ref": "#/entities/Challenge" },
+      "description": "Global daily and weekly challenges."
+    },
+    "/app_config/{configId}": {
+      "schema": { "$ref": "#/entities/AppSettings" },
+      "description": "Global app and ad configuration."
+    }
+  }
+}
