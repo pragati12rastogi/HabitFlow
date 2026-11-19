@@ -54,6 +54,7 @@
         "date": { "type": "string", "description": "Completion date YYYY-MM-DD." },
         "completedCount": { "type": "integer", "description": "Completions logged for this date." },
         "targetFrequency": { "type": "integer", "description": "Target frequency on that date." },
+        "durationSeconds": { "type": "integer", "description": "Total time in seconds spent on this habit on this date." },
         "notes": { "type": "string", "description": "Optional reflection or completion notes." },
         "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp of creation." },
         "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp of last update." }

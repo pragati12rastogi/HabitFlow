@@ -28,8 +28,35 @@ data class HabitStatSummary(
     val totalCompletions: Int,
     val currentStreak: Int,
     val longestStreak: Int,
-    val completionRate: Int
+    val completionRate: Int,
+    val totalDurationSeconds: Long = 0L
 )
+
+object HabitDurationFormatter {
+    fun formatCompact(seconds: Long): String {
+        val s = seconds.coerceAtLeast(0L)
+        val hours = s / 3600L
+        val mins = (s % 3600L) / 60L
+        val secs = s % 60L
+        return when {
+            hours > 0L -> "${hours}h ${mins}m"
+            mins > 0L -> if (secs > 0L && mins < 10L) "${mins}m ${secs}s" else "${mins}m"
+            else -> "${secs}s"
+        }
+    }
+
+    fun formatStopwatch(seconds: Long): String {
+        val s = seconds.coerceAtLeast(0L)
+        val hours = s / 3600L
+        val mins = (s % 3600L) / 60L
+        val secs = s % 60L
+        return if (hours > 0L) {
+            String.format(Locale.US, "%02d:%02d:%02d", hours, mins, secs)
+        } else {
+            String.format(Locale.US, "%02d:%02d", mins, secs)
+        }
+    }
+}
 
 object HabitDateUtils {
     private val isoFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
@@ -264,12 +291,16 @@ object HabitAnalyticsCalculator {
             }
             val scheduledInWindow = datesInWindow.count { isHabitScheduledOn(habit, it) }.coerceAtLeast(1)
             val rate = ((habitCompletions.size * 100f) / scheduledInWindow).toInt().coerceIn(0, 100)
+            val totalSeconds = completions
+                .filter { it.habitId == habit.id }
+                .sumOf { it.durationSeconds.coerceAtLeast(0L) }
             HabitStatSummary(
                 habit = habit,
                 totalCompletions = completions.count { it.habitId == habit.id && it.completedCount >= habit.targetFrequency },
                 currentStreak = current,
                 longestStreak = longest,
-                completionRate = rate
+                completionRate = rate,
+                totalDurationSeconds = totalSeconds
             )
         }.sortedByDescending { it.completionRate }
     }

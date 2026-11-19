@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.outlined.NightsStay
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material.icons.outlined.WbTwilight
 import androidx.compose.material3.Button
@@ -67,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import com.example.data.model.Habit
 import com.example.data.model.Routine
 import com.example.data.model.RoutineTimeOfDay
+import com.example.domain.HabitDurationFormatter
 import com.example.ui.theme.IndigoContainer
 import com.example.ui.theme.IndigoPrimary
 import com.example.ui.theme.MintContainer
@@ -78,6 +80,7 @@ import com.example.ui.viewmodel.HabitFlowDashboardData
 fun RoutinesScreen(
     data: HabitFlowDashboardData,
     onToggleHabitToday: (Habit) -> Unit,
+    onStartTimer: (Habit) -> Unit,
     onReorderHabit: (Routine, Int, Int) -> Unit,
     onSaveRoutine: (
         routineId: String?,
@@ -248,7 +251,8 @@ fun RoutinesScreen(
                             } else {
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     resolvedHabits.forEachIndexed { index, habit ->
-                                        val isDone = (todayCompletions[habit.id]?.completedCount ?: 0L) >= habit.targetFrequency
+                                        val comp = todayCompletions[habit.id]
+                                        val isDone = (comp?.completedCount ?: 0L) >= habit.targetFrequency
                                         Surface(
                                             shape = RoundedCornerShape(14.dp),
                                             color = if (isDone) MintContainer.copy(alpha = 0.45f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
@@ -286,10 +290,28 @@ fun RoutinesScreen(
                                                             textDecoration = if (isDone) TextDecoration.LineThrough else TextDecoration.None
                                                         )
                                                     )
+                                                    val secs = comp?.durationSeconds ?: 0L
                                                     Text(
-                                                        text = habit.category,
+                                                        text = if (secs > 0L) {
+                                                            "${habit.category} · ${HabitDurationFormatter.formatCompact(secs)} tracked"
+                                                        } else {
+                                                            habit.category
+                                                        },
                                                         style = MaterialTheme.typography.bodySmall,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                                IconButton(
+                                                    onClick = { onStartTimer(habit) },
+                                                    modifier = Modifier
+                                                        .size(48.dp)
+                                                        .testTag("routine_timer_${routine.id}_${habit.id}")
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Outlined.Timer,
+                                                        contentDescription = "Start stopwatch timer for ${habit.name}",
+                                                        tint = IndigoPrimary,
+                                                        modifier = Modifier.size(20.dp)
                                                     )
                                                 }
                                                 if (index > 0) {

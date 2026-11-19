@@ -5,6 +5,7 @@ import com.example.data.model.HabitCompletion
 import com.example.data.model.ScheduleType
 import com.example.domain.HabitAnalyticsCalculator
 import com.example.domain.HabitDateUtils
+import com.example.domain.HabitDurationFormatter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -24,7 +25,7 @@ class HabitAnalyticsCalculatorTest {
         paused = paused
     )
 
-    private fun completion(habitId: String, date: String) = HabitCompletion(
+    private fun completion(habitId: String, date: String, durationSeconds: Long = 0L) = HabitCompletion(
         id = "${habitId}_$date",
         userId = "user_1",
         habitId = habitId,
@@ -32,7 +33,8 @@ class HabitAnalyticsCalculatorTest {
         category = "Health",
         date = date,
         completedCount = 1L,
-        targetFrequency = 1L
+        targetFrequency = 1L,
+        durationSeconds = durationSeconds
     )
 
     @Test
@@ -84,5 +86,30 @@ class HabitAnalyticsCalculatorTest {
         )
         assertTrue(HabitAnalyticsCalculator.isHabitScheduledOn(wednesdayHabit, "2026-11-18"))
         assertFalse(HabitAnalyticsCalculator.isHabitScheduledOn(wednesdayHabit, "2026-11-19"))
+    }
+
+    @Test
+    fun durationFormatter_andSummaryTotals_computeAccurately() {
+        assertEquals("45s", HabitDurationFormatter.formatCompact(45L))
+        assertEquals("3m 15s", HabitDurationFormatter.formatCompact(195L))
+        assertEquals("15m", HabitDurationFormatter.formatCompact(900L))
+        assertEquals("1h 20m", HabitDurationFormatter.formatCompact(4800L))
+
+        assertEquals("00:45", HabitDurationFormatter.formatStopwatch(45L))
+        assertEquals("15:00", HabitDurationFormatter.formatStopwatch(900L))
+        assertEquals("01:02:03", HabitDurationFormatter.formatStopwatch(3723L))
+
+        val h1 = dailyHabit("h1")
+        val h2 = dailyHabit("h2")
+        val completions = listOf(
+            completion("h1", "2026-11-17", durationSeconds = 300L),
+            completion("h1", "2026-11-18", durationSeconds = 900L),
+            completion("h2", "2026-11-18", durationSeconds = 120L)
+        )
+        val summaries = HabitAnalyticsCalculator.calculateHabitSummaries(listOf(h1, h2), completions, "2026-11-18")
+        val s1 = summaries.first { it.habit.id == "h1" }
+        val s2 = summaries.first { it.habit.id == "h2" }
+        assertEquals(1200L, s1.totalDurationSeconds)
+        assertEquals(120L, s2.totalDurationSeconds)
     }
 }

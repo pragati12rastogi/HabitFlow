@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DeleteOutline
@@ -32,7 +33,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.Undo
+import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -75,6 +76,7 @@ import com.example.data.model.HabitPriority
 import com.example.data.model.ScheduleType
 import com.example.domain.HabitAnalyticsCalculator
 import com.example.domain.HabitDateUtils
+import com.example.domain.HabitDurationFormatter
 import com.example.ui.components.PriorityBadge
 import com.example.ui.components.StreakPill
 import com.example.ui.components.categoryIcon
@@ -699,6 +701,7 @@ fun TrackerScreen(
     selectedDate: String,
     onSelectDate: (String) -> Unit,
     onToggleHabit: (Habit, String) -> Unit,
+    onStartTimer: (Habit, String) -> Unit,
     onUpdateNotes: (HabitCompletion, String) -> Unit
 ) {
     val recentDays = HabitDateUtils.recentDates(data.todayStr, 7)
@@ -865,13 +868,31 @@ fun TrackerScreen(
                         }
                         Column(modifier = Modifier.weight(1f)) {
                             Text(habit.name, style = MaterialTheme.typography.titleMedium)
+                            val trackedSecs = comp?.durationSeconds ?: 0L
                             Text(
-                                text = "${habit.category} · $count/${habit.targetFrequency}",
+                                text = buildString {
+                                    append("${habit.category} · $count/${habit.targetFrequency}")
+                                    if (trackedSecs > 0L) {
+                                        append(" · ${HabitDurationFormatter.formatCompact(trackedSecs)} tracked")
+                                    }
+                                },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         PriorityBadge(habit.priority)
+                        IconButton(
+                            onClick = { onStartTimer(habit, selectedDate) },
+                            modifier = Modifier
+                                .size(48.dp)
+                                .testTag("tracker_timer_${habit.id}")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Timer,
+                                contentDescription = "Start stopwatch timer for ${habit.name}",
+                                tint = IndigoPrimary
+                            )
+                        }
                     }
                 }
             }
@@ -911,16 +932,44 @@ fun TrackerScreen(
                                     style = MaterialTheme.typography.titleMedium.copy(textDecoration = TextDecoration.LineThrough)
                                 )
                                 Text(
-                                    text = if (comp.notes.isNotBlank()) "Note: ${comp.notes}" else "Tap note icon to add reflection",
+                                    text = buildString {
+                                        if (comp.durationSeconds > 0L) {
+                                            append("${HabitDurationFormatter.formatCompact(comp.durationSeconds)} tracked")
+                                            if (comp.notes.isNotBlank()) append(" · ")
+                                        }
+                                        if (comp.notes.isNotBlank()) {
+                                            append("Note: ${comp.notes}")
+                                        } else if (comp.durationSeconds <= 0L) {
+                                            append("Tap note icon to add reflection")
+                                        }
+                                    },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            IconButton(onClick = { notesTarget = comp }) {
+                            IconButton(
+                                onClick = { onStartTimer(habit, selectedDate) },
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .testTag("tracker_timer_${habit.id}")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Timer,
+                                    contentDescription = "Add timed session for ${habit.name}",
+                                    tint = IndigoPrimary
+                                )
+                            }
+                            IconButton(
+                                onClick = { notesTarget = comp },
+                                modifier = Modifier.size(48.dp)
+                            ) {
                                 Icon(Icons.Outlined.EditNote, contentDescription = "Add or edit completion note")
                             }
-                            IconButton(onClick = { onToggleHabit(habit, selectedDate) }) {
-                                Icon(Icons.Outlined.Undo, contentDescription = "Undo completion")
+                            IconButton(
+                                onClick = { onToggleHabit(habit, selectedDate) },
+                                modifier = Modifier.size(48.dp)
+                            ) {
+                                Icon(Icons.AutoMirrored.Outlined.Undo, contentDescription = "Undo completion")
                             }
                         }
                     }

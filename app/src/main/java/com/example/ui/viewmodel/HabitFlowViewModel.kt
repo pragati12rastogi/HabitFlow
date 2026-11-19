@@ -67,12 +67,31 @@ data class HabitFlowDashboardData(
     val isAdmin: Boolean
 )
 
+data class StopwatchSession(
+    val habitId: String,
+    val habitName: String,
+    val category: String,
+    val colorHex: String,
+    val date: String,
+    val accumulatedSeconds: Long = 0L,
+    val runningSinceEpochMs: Long? = null,
+    val isSheetExpanded: Boolean = true
+) {
+    val isRunning: Boolean get() = runningSinceEpochMs != null
+
+    fun currentElapsedSeconds(nowMs: Long = System.currentTimeMillis()): Long {
+        val runningDelta = runningSinceEpochMs?.let { ((nowMs - it).coerceAtLeast(0L)) / 1000L } ?: 0L
+        return (accumulatedSeconds + runningDelta).coerceAtLeast(0L)
+    }
+}
+
 data class HabitFlowTransientState(
     val selectedTrackerDate: String = HabitDateUtils.todayIso(),
     val analyticsRangeDays: Int = 14,
     val analyticsCategoryFilter: String = "All",
     val snackbarMessage: String? = null,
-    val isBusy: Boolean = false
+    val isBusy: Boolean = false,
+    val activeStopwatch: StopwatchSession? = null
 )
 
 class HabitFlowViewModel(
@@ -258,6 +277,132 @@ class HabitFlowViewModel(
                 }
             }.onFailure { err ->
                 postMessage(err.localizedMessage ?: "Could not update completion")
+            }
+        }
+    }
+
+    fun startHabitTimer(habit: Habit, date: String) {
+        val existing = _transient.value.activeStopwatch
+        val now = System.currentTimeMillis()
+        if (existing != null && existing.habitId == habit.id && existing.date == date) {
+            _transient.update {
+                it.copy(
+                    activeStopwatch = existing.copy(
+                        runningSinceEpochMs = existing.runningSinceEpochMs ?: now,
+                        isSheetExpanded = true
+                    )
+                )
+            }
+            return
+        }
+        _transient.update {
+            it.copy(
+                activeStopwatch = StopwatchSession(
+                    habitId = habit.id,
+                    habitName = habit.name,
+                    category = habit.category,
+                    colorHex = habit.colorHex,
+                    date = date,
+                    accumulatedSeconds = 0L,
+                    runningSinceEpochMs = now,
+                    isSheetExpanded = true
+                )
+            )
+        }
+    }
+
+    fun pauseHabitTimer() {
+        val now = System.currentTimeMillis()
+        _transient.update { state ->
+            val current = state.activeStopwatch ?: return@update state
+            if (!current.isRunning) return@update state
+            state.copy(
+                activeStopwatch = current.copy(
+                    accumulatedSeconds = current.currentElapsedSeconds(now),
+                    runningSinceEpochMs = null
+                )
+            )
+        }
+    }
+
+    fun resumeHabitTimer() {
+        val now = System.currentTimeMillis()
+        _transient.update { state ->
+            val current = state.activeStopwatch ?: return@update state
+            if (current.isRunning) return@update state
+            state.copy(
+                activeStopwatch = current.copy(runningSinceEpochMs = now)
+            )
+        }
+    }
+
+    fun resetHabitTimer() {
+        _transient.update { state ->
+            val current = state.activeStopwatch ?: return@update state
+            state.copy(
+                activeStopwatch = current.copy(
+                    accumulatedSeconds = 0L,
+                    runningSinceEpochMs = null
+                )
+            )
+        }
+    }
+
+    fun discardHabitTimer() {
+        _transient.update { it.copy(activeStopwatch = null) }
+    }
+
+    fun setStopwatchSheetExpanded(expanded: Boolean) {
+        _transient.update { state ->
+            val current = state.activeStopwatch ?: return@update state
+            state.copy(activeStopwatch = current.copy(isSheetExpanded = expanded))
+        }
+    }
+
+    fun finishHabitTimer(markCompleted: Boolean = true, notes: String = "") {
+        val session = _transient.value.activeStopwatch ?: return
+        val currentData = (uiState.value as? UiState.Success)?.data ?: return
+        val habit = currentData.habits.firstOrNull { it.id == session.habitId }
+        if (habit == null) {
+            _transient.update { it.copy(activeStopwatch = null) }
+            postMessage("Habit no longer exists")
+            return
+        }
+        val elapsedSeconds = session.currentElapsedSeconds().coerceAtLeast(1L)
+        val existing = currentData.completions.firstOrNull {
+            it.habitId == habit.id && it.date == session.date
+        }
+        _transient.update { it.copy(activeStopwatch = null) }
+
+        viewModelScope.launch {
+            val result = repository.logHabitSessionDuration(
+                userId = currentUserId,
+                habit = habit,
+                date = session.date,
+                existingCompletion = existing,
+                addedSeconds = elapsedSeconds,
+                markCompleted = markCompleted,
+                notes = notes
+            )
+            result.onSuccess { newlyCompleted ->
+                val durationLabel = com.example.domain.HabitDurationFormatter.formatCompact(elapsedSeconds)
+                if (newlyCompleted) {
+                    val bonusXp = if (elapsedSeconds >= 300L) 30L else 20L
+                    val newXp = currentData.profile.xp + bonusXp
+                    repository.awardXp(currentUserId, newXp)
+                    evaluateGamification(currentData, newlyCompletedHabit = true, newBaseXp = newXp)
+                    postMessage("Logged $durationLabel & completed \"${habit.name}\" (+$bonusXp XP)")
+                } else {
+                    val bonusXp = if (elapsedSeconds >= 60L) 10L else 0L
+                    if (bonusXp > 0L) {
+                        repository.awardXp(currentUserId, currentData.profile.xp + bonusXp)
+                        postMessage("Added $durationLabel to \"${habit.name}\" (+$bonusXp XP)")
+                    } else {
+                        postMessage("Logged $durationLabel on \"${habit.name}\"")
+                    }
+                }
+            }.onFailure { err ->
+                postMessage(err.localizedMessage ?: "Failed to log timer session")
             }
         }
     }

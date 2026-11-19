@@ -20,11 +20,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.FormatQuote
-import androidx.compose.material.icons.outlined.TrendingUp
+import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -51,6 +52,7 @@ import com.example.R
 import com.example.data.model.Habit
 import com.example.domain.HabitAnalyticsCalculator
 import com.example.domain.HabitDateUtils
+import com.example.domain.HabitDurationFormatter
 import com.example.ui.components.AnimatedCompletionRing
 import com.example.ui.components.EmptyHabitsCard
 import com.example.ui.components.PriorityBadge
@@ -71,6 +73,7 @@ import com.example.ui.viewmodel.HabitFlowDashboardData
 fun DashboardScreen(
     data: HabitFlowDashboardData,
     onToggleHabit: (Habit) -> Unit,
+    onStartTimer: (Habit) -> Unit,
     onCreateHabit: () -> Unit,
     onLoadDemoData: () -> Unit,
     onOpenTracker: () -> Unit,
@@ -368,13 +371,29 @@ fun DashboardScreen(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = "${habit.category} · $doneCount/${habit.targetFrequency} today" +
-                                        if (habit.reminderTime.isNotBlank()) " · ${habit.reminderTime}" else "",
+                                    text = buildString {
+                                        append("${habit.category} · $doneCount/${habit.targetFrequency} today")
+                                        val secs = comp?.durationSeconds ?: 0L
+                                        if (secs > 0L) append(" · ${HabitDurationFormatter.formatCompact(secs)} tracked")
+                                        if (habit.reminderTime.isNotBlank()) append(" · ${habit.reminderTime}")
+                                    },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                             PriorityBadge(habit.priority)
+                            IconButton(
+                                onClick = { onStartTimer(habit) },
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .testTag("dashboard_timer_${habit.id}")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Timer,
+                                    contentDescription = "Start stopwatch timer for ${habit.name}",
+                                    tint = IndigoPrimary
+                                )
+                            }
                         }
                     }
                 }
@@ -417,7 +436,7 @@ fun DashboardScreen(
                             )
                         }
                         TextButton(onClick = onOpenAnalytics) {
-                            Icon(Icons.Outlined.TrendingUp, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.AutoMirrored.Outlined.TrendingUp, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Analytics")
                         }

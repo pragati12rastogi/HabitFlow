@@ -76,6 +76,8 @@ import com.example.auth.authStateFlow
 import com.example.auth.signOutUser
 import com.example.data.repository.HabitRepository
 import com.example.notifications.HabitReminderScheduler
+import com.example.ui.components.ActiveStopwatchBar
+import com.example.ui.components.StopwatchFocusSheet
 import com.example.ui.screens.AchievementsScreen
 import com.example.ui.screens.AdminScreen
 import com.example.ui.screens.AnalyticsScreen
@@ -354,101 +356,148 @@ private fun MainHabitFlowShell(user: FirebaseUser) {
 
                             is UiState.Success -> {
                                 val data = state.data
-                                NavHost(
-                                    navController = navController,
-                                    startDestination = HabitRoutes.DASHBOARD
-                                ) {
-                                    composable(HabitRoutes.DASHBOARD) {
-                                        DashboardScreen(
-                                            data = data,
-                                            onToggleHabit = { habit ->
-                                                viewModel.toggleHabitCompletion(habit, data.todayStr)
-                                            },
-                                            onCreateHabit = {
-                                                openCreateHabitSheet = true
-                                                navigateTab(HabitRoutes.HABITS)
-                                            },
-                                            onLoadDemoData = { viewModel.loadDemoData() },
-                                            onOpenTracker = { navController.navigate(HabitRoutes.TRACKER) },
-                                            onOpenRoutines = { navigateTab(HabitRoutes.ROUTINES) },
-                                            onOpenAnalytics = { navigateTab(HabitRoutes.ANALYTICS) },
-                                            onOpenAchievements = { navController.navigate(HabitRoutes.ACHIEVEMENTS) }
-                                        )
-                                    }
-                                    composable(HabitRoutes.HABITS) {
-                                        HabitsScreen(
-                                            data = data,
-                                            openCreateInitially = openCreateHabitSheet,
-                                            onConsumeOpenCreate = { openCreateHabitSheet = false },
-                                            onSaveHabit = viewModel::saveHabit,
-                                            onTogglePaused = viewModel::toggleHabitPaused,
-                                            onDeleteHabit = viewModel::deleteHabit,
-                                            onOpenTracker = { navController.navigate(HabitRoutes.TRACKER) }
-                                        )
-                                    }
-                                    composable(HabitRoutes.ROUTINES) {
-                                        RoutinesScreen(
-                                            data = data,
-                                            onToggleHabitToday = { habit ->
-                                                viewModel.toggleHabitCompletion(habit, data.todayStr)
-                                            },
-                                            onReorderHabit = viewModel::reorderRoutineHabit,
-                                            onSaveRoutine = viewModel::saveRoutine,
-                                            onDeleteRoutine = viewModel::deleteRoutine
-                                        )
-                                    }
-                                    composable(HabitRoutes.ANALYTICS) {
-                                        AnalyticsScreen(
-                                            data = data,
-                                            rangeDays = transient.analyticsRangeDays,
-                                            categoryFilter = transient.analyticsCategoryFilter,
-                                            onSelectRange = viewModel::setAnalyticsRange,
-                                            onSelectCategory = viewModel::setAnalyticsCategory
-                                        )
-                                    }
-                                    composable(HabitRoutes.PROFILE) {
-                                        ProfileScreen(
-                                            data = data,
-                                            onUpdateProfile = viewModel::updateProfile,
-                                            onLoadDemoData = viewModel::loadDemoData,
-                                            onOpenAchievements = { navController.navigate(HabitRoutes.ACHIEVEMENTS) },
-                                            onOpenAdmin = { navController.navigate(HabitRoutes.ADMIN) },
-                                            onSignOut = {
-                                                signOutUser(credentialManager = credentialManager, scope = scope)
-                                            },
-                                            onNotifyMessage = { msg ->
-                                                scope.launch { snackbarHostState.showSnackbar(msg) }
+                                val activeStopwatch = transient.activeStopwatch
+                                Column(modifier = Modifier.fillMaxSize()) {
+                                    Box(modifier = Modifier.weight(1f).fillMaxSize()) {
+                                        NavHost(
+                                            navController = navController,
+                                            startDestination = HabitRoutes.DASHBOARD
+                                        ) {
+                                            composable(HabitRoutes.DASHBOARD) {
+                                                DashboardScreen(
+                                                    data = data,
+                                                    onToggleHabit = { habit ->
+                                                        viewModel.toggleHabitCompletion(habit, data.todayStr)
+                                                    },
+                                                    onStartTimer = { habit ->
+                                                        viewModel.startHabitTimer(habit, data.todayStr)
+                                                    },
+                                                    onCreateHabit = {
+                                                        openCreateHabitSheet = true
+                                                        navigateTab(HabitRoutes.HABITS)
+                                                    },
+                                                    onLoadDemoData = { viewModel.loadDemoData() },
+                                                    onOpenTracker = { navController.navigate(HabitRoutes.TRACKER) },
+                                                    onOpenRoutines = { navigateTab(HabitRoutes.ROUTINES) },
+                                                    onOpenAnalytics = { navigateTab(HabitRoutes.ANALYTICS) },
+                                                    onOpenAchievements = { navController.navigate(HabitRoutes.ACHIEVEMENTS) }
+                                                )
                                             }
-                                        )
-                                    }
-                                    composable(HabitRoutes.TRACKER) {
-                                        TrackerScreen(
-                                            data = data,
-                                            selectedDate = transient.selectedTrackerDate,
-                                            onSelectDate = viewModel::selectTrackerDate,
-                                            onToggleHabit = { habit, date ->
-                                                viewModel.toggleHabitCompletion(habit, date)
-                                            },
-                                            onUpdateNotes = { comp, notes ->
-                                                viewModel.updateCompletionNotes(comp.id, notes)
+                                            composable(HabitRoutes.HABITS) {
+                                                HabitsScreen(
+                                                    data = data,
+                                                    openCreateInitially = openCreateHabitSheet,
+                                                    onConsumeOpenCreate = { openCreateHabitSheet = false },
+                                                    onSaveHabit = viewModel::saveHabit,
+                                                    onTogglePaused = viewModel::toggleHabitPaused,
+                                                    onDeleteHabit = viewModel::deleteHabit,
+                                                    onOpenTracker = { navController.navigate(HabitRoutes.TRACKER) }
+                                                )
                                             }
+                                            composable(HabitRoutes.ROUTINES) {
+                                                RoutinesScreen(
+                                                    data = data,
+                                                    onToggleHabitToday = { habit ->
+                                                        viewModel.toggleHabitCompletion(habit, data.todayStr)
+                                                    },
+                                                    onStartTimer = { habit ->
+                                                        viewModel.startHabitTimer(habit, data.todayStr)
+                                                    },
+                                                    onReorderHabit = viewModel::reorderRoutineHabit,
+                                                    onSaveRoutine = viewModel::saveRoutine,
+                                                    onDeleteRoutine = viewModel::deleteRoutine
+                                                )
+                                            }
+                                            composable(HabitRoutes.ANALYTICS) {
+                                                AnalyticsScreen(
+                                                    data = data,
+                                                    rangeDays = transient.analyticsRangeDays,
+                                                    categoryFilter = transient.analyticsCategoryFilter,
+                                                    onSelectRange = viewModel::setAnalyticsRange,
+                                                    onSelectCategory = viewModel::setAnalyticsCategory
+                                                )
+                                            }
+                                            composable(HabitRoutes.PROFILE) {
+                                                ProfileScreen(
+                                                    data = data,
+                                                    onUpdateProfile = viewModel::updateProfile,
+                                                    onLoadDemoData = viewModel::loadDemoData,
+                                                    onOpenAchievements = { navController.navigate(HabitRoutes.ACHIEVEMENTS) },
+                                                    onOpenAdmin = { navController.navigate(HabitRoutes.ADMIN) },
+                                                    onSignOut = {
+                                                        signOutUser(credentialManager = credentialManager, scope = scope)
+                                                    },
+                                                    onNotifyMessage = { msg ->
+                                                        scope.launch { snackbarHostState.showSnackbar(msg) }
+                                                    }
+                                                )
+                                            }
+                                            composable(HabitRoutes.TRACKER) {
+                                                TrackerScreen(
+                                                    data = data,
+                                                    selectedDate = transient.selectedTrackerDate,
+                                                    onSelectDate = viewModel::selectTrackerDate,
+                                                    onToggleHabit = { habit, date ->
+                                                        viewModel.toggleHabitCompletion(habit, date)
+                                                    },
+                                                    onStartTimer = { habit, date ->
+                                                        viewModel.startHabitTimer(habit, date)
+                                                    },
+                                                    onUpdateNotes = { comp, notes ->
+                                                        viewModel.updateCompletionNotes(comp.id, notes)
+                                                    }
+                                                )
+                                            }
+                                            composable(HabitRoutes.ACHIEVEMENTS) {
+                                                AchievementsScreen(data = data)
+                                            }
+                                            composable(HabitRoutes.ADMIN) {
+                                                AdminScreen(
+                                                    data = data,
+                                                    adminUsers = adminUsers,
+                                                    onSaveCategory = viewModel::adminSaveCategory,
+                                                    onDeleteCategory = viewModel::adminDeleteCategory,
+                                                    onSaveQuote = viewModel::adminSaveQuote,
+                                                    onDeleteQuote = viewModel::adminDeleteQuote,
+                                                    onSaveChallenge = viewModel::adminSaveChallenge,
+                                                    onSaveAppSettings = viewModel::adminSaveAppSettings
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    if (activeStopwatch != null) {
+                                        ActiveStopwatchBar(
+                                            session = activeStopwatch,
+                                            onExpand = { viewModel.setStopwatchSheetExpanded(true) },
+                                            onPause = viewModel::pauseHabitTimer,
+                                            onResume = viewModel::resumeHabitTimer,
+                                            onQuickFinish = { viewModel.finishHabitTimer(markCompleted = true) }
                                         )
                                     }
-                                    composable(HabitRoutes.ACHIEVEMENTS) {
-                                        AchievementsScreen(data = data)
-                                    }
-                                    composable(HabitRoutes.ADMIN) {
-                                        AdminScreen(
-                                            data = data,
-                                            adminUsers = adminUsers,
-                                            onSaveCategory = viewModel::adminSaveCategory,
-                                            onDeleteCategory = viewModel::adminDeleteCategory,
-                                            onSaveQuote = viewModel::adminSaveQuote,
-                                            onDeleteQuote = viewModel::adminDeleteQuote,
-                                            onSaveChallenge = viewModel::adminSaveChallenge,
-                                            onSaveAppSettings = viewModel::adminSaveAppSettings
-                                        )
-                                    }
+                                }
+
+                                if (activeStopwatch != null && activeStopwatch.isSheetExpanded) {
+                                    val previouslyLoggedToday = data.completions
+                                        .firstOrNull {
+                                            it.habitId == activeStopwatch.habitId && it.date == activeStopwatch.date
+                                        }
+                                        ?.durationSeconds ?: 0L
+                                    StopwatchFocusSheet(
+                                        session = activeStopwatch,
+                                        previouslyLoggedSecondsToday = previouslyLoggedToday,
+                                        onMinimize = { viewModel.setStopwatchSheetExpanded(false) },
+                                        onPause = viewModel::pauseHabitTimer,
+                                        onResume = viewModel::resumeHabitTimer,
+                                        onReset = viewModel::resetHabitTimer,
+                                        onDiscard = viewModel::discardHabitTimer,
+                                        onFinishAndComplete = { notes ->
+                                            viewModel.finishHabitTimer(markCompleted = true, notes = notes)
+                                        },
+                                        onLogTimeOnly = { notes ->
+                                            viewModel.finishHabitTimer(markCompleted = false, notes = notes)
+                                        }
+                                    )
                                 }
                             }
                         }

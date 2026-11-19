@@ -160,7 +160,7 @@ test("Habits & Completions & Routines: Kotlin-mirrored payloads and isolation", 
     })
   );
 
-  // Create completion keyed by habitId_date
+  // Create completion keyed by habitId_date with stopwatch durationSeconds
   await assertSucceeds(
     aliceDb.collection("users").doc(ALICE_UID).collection("completions").doc("habit_1_2026-11-18").set({
       userId: ALICE_UID,
@@ -170,16 +170,26 @@ test("Habits & Completions & Routines: Kotlin-mirrored payloads and isolation", 
       date: "2026-11-18",
       completedCount: 1,
       targetFrequency: 1,
+      durationSeconds: 600,
       notes: "Felt very calm today",
       createdAt: past,
       updatedAt: past,
     })
   );
 
-  // Update completion notes
+  // Update completion notes and durationSeconds
   await assertSucceeds(
     aliceDb.collection("users").doc(ALICE_UID).collection("completions").doc("habit_1_2026-11-18").update({
+      durationSeconds: 900,
       notes: "Deep focus session",
+      updatedAt: new Date(Date.now() - 1000),
+    })
+  );
+
+  // Reject negative durationSeconds
+  await assertFails(
+    aliceDb.collection("users").doc(ALICE_UID).collection("completions").doc("habit_1_2026-11-18").update({
+      durationSeconds: -10,
       updatedAt: new Date(Date.now() - 1000),
     })
   );

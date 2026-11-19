@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
@@ -42,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.domain.DefaultCatalogs
 import com.example.domain.HabitAnalyticsCalculator
+import com.example.domain.HabitDurationFormatter
 import com.example.ui.components.CalendarHeatmap
 import com.example.ui.components.SponsoredBannerSlot
 import com.example.ui.components.StreakPill
@@ -88,6 +90,8 @@ fun AnalyticsScreen(
         val completed = trendPoints.sumOf { it.completed }
         if (scheduled == 0) 0 else ((completed * 100f) / scheduled).toInt().coerceIn(0, 100)
     }
+    val totalFocusSeconds = filteredSummaries.sumOf { it.totalDurationSeconds }
+    val timedHabitsCount = filteredSummaries.count { it.totalDurationSeconds > 0L }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -164,6 +168,57 @@ fun AnalyticsScreen(
                     tint = MintSuccess,
                     modifier = Modifier.weight(1f)
                 )
+            }
+        }
+
+        // Focus Time Summary Card
+        item {
+            Card(
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(IndigoContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Timer,
+                            contentDescription = "Total focus time",
+                            tint = IndigoPrimary
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Total Focus Time ($categoryFilter)",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = if (totalFocusSeconds > 0L) {
+                                HabitDurationFormatter.formatCompact(totalFocusSeconds)
+                            } else {
+                                "0m tracked yet"
+                            },
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                            color = IndigoPrimary
+                        )
+                    }
+                    Text(
+                        text = "$timedHabitsCount timed",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
 
@@ -252,7 +307,12 @@ fun AnalyticsScreen(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(summary.habit.name, style = MaterialTheme.typography.titleMedium)
                                 Text(
-                                    text = "${summary.habit.category} · ${summary.totalCompletions} total · Best ${summary.longestStreak}d",
+                                    text = buildString {
+                                        append("${summary.habit.category} · ${summary.totalCompletions} total · Best ${summary.longestStreak}d")
+                                        if (summary.totalDurationSeconds > 0L) {
+                                            append(" · ${HabitDurationFormatter.formatCompact(summary.totalDurationSeconds)} tracked")
+                                        }
+                                    },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )

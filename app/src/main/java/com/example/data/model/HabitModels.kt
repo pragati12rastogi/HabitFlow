@@ -99,6 +99,7 @@ data class HabitCompletion(
     val date: String = "",
     val completedCount: Long = 1L,
     val targetFrequency: Long = 1L,
+    val durationSeconds: Long = 0L,
     val notes: String = "",
     @ServerTimestamp val createdAt: Timestamp? = null,
     @ServerTimestamp val updatedAt: Timestamp? = null

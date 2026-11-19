@@ -443,6 +443,7 @@ class HabitRepository(
                             "date" to date,
                             "completedCount" to nextCount,
                             "targetFrequency" to habit.targetFrequency.coerceIn(1L, 20L),
+                            "durationSeconds" to 0L,
                             "notes" to notes.trim().take(300),
                             "createdAt" to FieldValue.serverTimestamp(),
                             "updatedAt" to FieldValue.serverTimestamp()
@@ -462,6 +463,88 @@ class HabitRepository(
                 }
                 Result.success(nextCount >= habit.targetFrequency)
             }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.WRITE, docPath)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun logHabitSessionDuration(
+        userId: String,
+        habit: Habit,
+        date: String,
+        existingCompletion: HabitCompletion?,
+        addedSeconds: Long,
+        markCompleted: Boolean,
+        notes: String = ""
+    ): Result<Boolean> {
+        val completionId = "${habit.id}_$date"
+        val docPath = "users/$userId/completions/$completionId"
+        return try {
+            val uid = requireUserId()
+            check(uid == userId)
+            require(habit.id.isNotBlank() && date.length == 10)
+            val safeAdded = addedSeconds.coerceIn(1L, 86400L)
+            val docRef = db.collection("users").document(uid)
+                .collection("completions").document(completionId)
+            val snap = docRef.get().await()
+
+            val prevDuration = if (snap.exists()) {
+                (snap.getLong("durationSeconds") ?: existingCompletion?.durationSeconds ?: 0L).coerceAtLeast(0L)
+            } else {
+                0L
+            }
+            val newDuration = (prevDuration + safeAdded).coerceIn(1L, 86400L)
+            val targetFreq = habit.targetFrequency.coerceIn(1L, 20L)
+            val prevCount = if (snap.exists()) {
+                (snap.getLong("completedCount") ?: existingCompletion?.completedCount ?: 1L).coerceAtLeast(1L)
+            } else {
+                0L
+            }
+            val wasFullyCompleted = snap.exists() && prevCount >= targetFreq
+            val nextCount = if (markCompleted) {
+                if (prevCount < targetFreq) (prevCount + 1L).coerceAtMost(targetFreq) else prevCount
+            } else {
+                prevCount.coerceAtLeast(1L)
+            }
+            val combinedNotes = when {
+                notes.isNotBlank() -> notes.trim()
+                else -> (snap.getString("notes") ?: existingCompletion?.notes ?: "").trim()
+            }.take(300)
+
+            if (!snap.exists()) {
+                docRef.set(
+                    mapOf(
+                        "userId" to uid,
+                        "habitId" to habit.id,
+                        "habitName" to habit.name.take(100),
+                        "category" to habit.category.take(50),
+                        "date" to date,
+                        "completedCount" to nextCount,
+                        "targetFrequency" to targetFreq,
+                        "durationSeconds" to newDuration,
+                        "notes" to combinedNotes,
+                        "createdAt" to FieldValue.serverTimestamp(),
+                        "updatedAt" to FieldValue.serverTimestamp()
+                    )
+                ).await()
+            } else {
+                docRef.update(
+                    mapOf(
+                        "habitName" to habit.name.take(100),
+                        "category" to habit.category.take(50),
+                        "completedCount" to nextCount,
+                        "targetFrequency" to targetFreq,
+                        "durationSeconds" to newDuration,
+                        "notes" to combinedNotes,
+                        "updatedAt" to FieldValue.serverTimestamp()
+                    )
+                ).await()
+            }
+            val newlyCompleted = markCompleted && !wasFullyCompleted && nextCount >= targetFreq
+            Result.success(newlyCompleted)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -731,6 +814,7 @@ class HabitRepository(
                 batch.set(comp1, mapOf(
                     "userId" to uid, "habitId" to "demo_hydrate", "habitName" to "Morning Hydration",
                     "category" to "Health", "date" to date, "completedCount" to 1L, "targetFrequency" to 1L,
+                    "durationSeconds" to 180L,
                     "notes" to "Refreshed start!", "createdAt" to FieldValue.serverTimestamp(), "updatedAt" to FieldValue.serverTimestamp()
                 ))
                 if (offset <= 6 || offset == 8) {
@@ -738,6 +822,7 @@ class HabitRepository(
                     batch.set(comp2, mapOf(
                         "userId" to uid, "habitId" to "demo_meditate", "habitName" to "Mindful Breathing",
                         "category" to "Mindfulness", "date" to date, "completedCount" to 1L, "targetFrequency" to 1L,
+                        "durationSeconds" to 600L,
                         "notes" to "", "createdAt" to FieldValue.serverTimestamp(), "updatedAt" to FieldValue.serverTimestamp()
                     ))
                 }
@@ -746,6 +831,7 @@ class HabitRepository(
                     batch.set(comp3, mapOf(
                         "userId" to uid, "habitId" to "demo_read", "habitName" to "Read 20 Pages",
                         "category" to "Learning", "date" to date, "completedCount" to 1L, "targetFrequency" to 1L,
+                        "durationSeconds" to 1500L,
                         "notes" to "Great chapter", "createdAt" to FieldValue.serverTimestamp(), "updatedAt" to FieldValue.serverTimestamp()
                     ))
                 }

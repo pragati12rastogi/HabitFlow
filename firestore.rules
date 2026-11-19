@@ -81,6 +81,7 @@ service cloud.firestore {
              data.date is string && data.date.size() == 10 &&
              data.completedCount is int && data.completedCount >= 1 && data.completedCount <= 20 &&
              data.targetFrequency is int && data.targetFrequency >= 1 && data.targetFrequency <= 20 &&
+             (!('durationSeconds' in data) || (data.durationSeconds is int && data.durationSeconds >= 0 && data.durationSeconds <= 86400)) &&
              (!('notes' in data) || (data.notes is string && data.notes.size() <= 300)) &&
              isValidTimestamp(data.createdAt) &&
              isValidTimestamp(data.updatedAt);
@@ -221,7 +222,7 @@ service cloud.firestore {
                          isValidId(completionId) &&
                          incoming().userId == request.auth.uid &&
                          incoming().keys().hasAll(['userId', 'habitId', 'habitName', 'category', 'date', 'completedCount', 'targetFrequency', 'createdAt', 'updatedAt']) &&
-                         incoming().keys().hasOnly(['userId', 'habitId', 'habitName', 'category', 'date', 'completedCount', 'targetFrequency', 'notes', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'habitId', 'habitName', 'category', 'date', 'completedCount', 'targetFrequency', 'durationSeconds', 'notes', 'createdAt', 'updatedAt']) &&
                          isValidHabitCompletion(incoming());
 
         allow update: if isOwner(userId) &&
@@ -232,7 +233,7 @@ service cloud.firestore {
                          incoming().habitId == existing().habitId &&
                          incoming().date == existing().date &&
                          incoming().createdAt == existing().createdAt &&
-                         incoming().diff(existing()).affectedKeys().hasOnly(['habitName', 'category', 'completedCount', 'targetFrequency', 'notes', 'updatedAt']);
+                         incoming().diff(existing()).affectedKeys().hasOnly(['habitName', 'category', 'completedCount', 'targetFrequency', 'durationSeconds', 'notes', 'updatedAt']);
 
         allow delete: if isValidId(userId) && isValidId(completionId) && isOwner(userId);
       }
